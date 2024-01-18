@@ -37,6 +37,8 @@ namespace MikoUtils
     }
 
     public class MikoFunc {
+        // Used in level / checkpoint / subobject loading commands,
+        // making it possibel to load them with either absolute id, or steps relative from the id
         public static int LoadNum(string txt, int cur)
         {
             int result;
@@ -72,7 +74,7 @@ namespace MikoUtils
     }
 
     // // Prevent kick (remove this when releasing!) - client
-    // // > Prevents any codes in App.ServerKicked() to execute.   
+    // // + Prevents any codes in App.ServerKicked() to execute.   
     // [HarmonyPatch(typeof(App), "ServerKicked")]
     // public class KickMeNot
     // {
@@ -85,8 +87,8 @@ namespace MikoUtils
     // }
 
     // Power kick - host
-    // > Force disconnect player from the host when /kick <#player>
-    // > Further attempt from the player to connect to session is already stopped by vanilla game \ / 
+    // + Force disconnect players from the host with /kick <#player>
+    // + Further attempt from the players to connect to the session is already stopped by vanilla game \ / 
     [HarmonyPatch(typeof(NetChat), "OnKick")]
     public class YesKick
     {
@@ -101,8 +103,8 @@ namespace MikoUtils
     }
 
     // Level Command utilities - host
-    // > level(l) command can be used in multiplayer session now
-    // > relative level no.
+    // + level(l) command can be used in multiplayer session now
+    // + relative level loading.
     [HarmonyPatch(typeof(CheatCodes), "LevelChange")]
     public class LevelChange
     {
@@ -174,7 +176,7 @@ namespace MikoUtils
     }
 
     // CP command utilities - host
-    // > relative cp no.
+    // + relative cp loading.
     [HarmonyPatch(typeof(CheatCodes), "CheckpointChange")]
     public class CheckpointChange
     {
@@ -219,8 +221,8 @@ namespace MikoUtils
     public class MikoCmds 
     {
         // Spam kick - host
-        // > equivalent to spamming /kick <#player> (vanilla /kick instead of Power kick)
-        // > Why? Because it is funny lol
+        // + equivalent to spamming /kick <#player> (vanilla /kick instead of Power kick)
+        // + Why? Because it is funny lol
         public static void OnSpamKick(string txt)
         {
             if (string.IsNullOrEmpty(txt))
