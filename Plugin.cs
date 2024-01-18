@@ -22,7 +22,7 @@ namespace MikoUtils
         {
             _harmony.PatchAll();
 
-            // Register commande
+            // Register commands
             Shell.RegisterCommand("spamkick", new Action<string>(MikoCmds.OnSpamKick), "spamkick <player#> <times>\r\nRepeatedly kicks player (vanilla soft kick). \r\nUsefull for kicking some modded players in a funny way.");
             NetChat.RegisterCommand(true, false, "invt", new Action(MikoCmds.ToggleInvite), "/invt-切换仅限邀请");
             NetChat.RegisterCommand(true, false, "join", new Action(MikoCmds.ToggleJoin), "/join-切换参加正在进行的游戏");
