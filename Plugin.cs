@@ -1,4 +1,4 @@
-﻿using BepInEx;
+using BepInEx;
 using HarmonyLib;
 using Multiplayer;
 using System;
@@ -25,7 +25,7 @@ namespace MikoUtils
             // Register commande
             Shell.RegisterCommand("spamkick", new Action<string>(MikoCmds.OnSpamKick), "spamkick <player#> <times>\r\nRepeatedly kicks player (vanilla soft kick). \r\nUsefull for kicking some modded players in a funny way.");
             NetChat.RegisterCommand(true, false, "invt", new Action(MikoCmds.ToggleInvite), "/invt-切换仅限邀请");
-			NetChat.RegisterCommand(true, false, "join", new Action(MikoCmds.ToggleJoin), "/join-切换参加正在进行的游戏");
+            NetChat.RegisterCommand(true, false, "join", new Action(MikoCmds.ToggleJoin), "/join-切换参加正在进行的游戏");
             Shell.RegisterCommand("s", new Action<string>(MikoCmds.SubObjective), null);
             Shell.RegisterCommand("so", new Action<string>(MikoCmds.SubObjective), "so(s) <subobjective>\r\nsubobjective~次要目标序号 接受的值：整数，+/-号，带+/-号的整数");
         }
@@ -79,7 +79,7 @@ namespace MikoUtils
     //     [HarmonyPrefix]
     //     public static bool Prefix()
     //     {
-    //     	NetChat.Print("KickMeNot:)");
+    //         NetChat.Print("KickMeNot:)");
     //         return false;
     //     }
     // }
@@ -96,7 +96,7 @@ namespace MikoUtils
             MethodInfo methodInfo = AccessTools.Method(typeof(NetChat), "GetClient");
             NetHost client = (NetHost)methodInfo.Invoke(__instance, new object[] { txt });
 
-			NetGame.instance.OnDisconnect(client.connection, false);
+            NetGame.instance.OnDisconnect(client.connection, false);
         }
     }
 
@@ -277,32 +277,32 @@ namespace MikoUtils
 
         // In game InviteOnly toggle - host
         public static void ToggleInvite()
-		{
-			if (Options.lobbyInviteOnly == 0)
-			{
-				new MultiplayerLobbySettingsMenu().InviteOnlyChanged(1);
-				NetChat.Print("仅限邀请：启用");
-			}
+        {
+            if (Options.lobbyInviteOnly == 0)
+            {
+                new MultiplayerLobbySettingsMenu().InviteOnlyChanged(1);
+                NetChat.Print("仅限邀请：启用");
+            }
             else 
             {
                 new MultiplayerLobbySettingsMenu().InviteOnlyChanged(0);
                 NetChat.Print("仅限邀请：禁用");
             }
-		}
+        }
 
         // In game JoinInProgress toggle - host
-		public static void ToggleJoin()
-		{
-			if (Options.lobbyJoinInProgress == 0)
-			{
-				new MultiplayerLobbySettingsMenu().JoinInProgressChanged(1);
-				NetChat.Print("参加正在进行的游戏：启用");
-			}
+        public static void ToggleJoin()
+        {
+            if (Options.lobbyJoinInProgress == 0)
+            {
+                new MultiplayerLobbySettingsMenu().JoinInProgressChanged(1);
+                NetChat.Print("参加正在进行的游戏：启用");
+            }
             else {
                 new MultiplayerLobbySettingsMenu().JoinInProgressChanged(0);
                 NetChat.Print("参加正在进行的游戏：禁用");
             }
-		}
+        }
 
         // Load SubObjective (similar to level and cp) - host
         public static void SubObjective(string txt)
