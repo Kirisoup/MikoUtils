@@ -1,6 +1,6 @@
 # MikoUtils
 
-A Human: Fall Flat plugin based on [BePinEx](https://github.com/BepInEx/BepInEx), that aims at simplicity and quality-of-life aspects of online session hosting. 
+A Human: Fall Flat plugin based on [BePinEx](https://github.com/BepInEx/BepInEx), that aimed at simplicity and quality-of-life aspects of online session hosting. 
 
 ## Usage: 
 1. Download the [latest release of BePinEx](https://github.com/BepInEx/BepInEx/releases/latest). AFAIK it should be the `BepInEx_x86... .zip` in most cases; 
