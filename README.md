@@ -64,7 +64,7 @@ A Human: Fall Flat plugin based on [BePinEx](https://github.com/BepInEx/BepInEx)
 ## TODO: 
 - Support English.
 - Some random ideas:
-  - PartyPass: pass the level only if every players has entered the pass trigger
+  - PartyPass: pass the level only if every players have entered the pass trigger
   - An option to let the host decide whether to accept a connection when new players are trying to join
 
 # Any suggestion and bug reports are apppreciated!
