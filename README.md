@@ -38,7 +38,7 @@ A Human: Fall Flat plugin based on [BePinEx](https://github.com/BepInEx/BepInEx)
   **General change:**
   - You can now use +/-<integer> to load levels/checkpoints/sub-objectives relative to the current number (+/-1 can be abbreviated as +/-). 
 
-    E.g., `cp -1` or `c -` to load the previous checkpoint, or skip two levels with `level +2` or `l +2`. 
+    E.g., `cp -1` or `c -` to load the previous checkpoint, or skip two levels ahead with `level +2` or `l +2`. 
 
   **Special changes to `level`:**
   - The second parameter of `level` is now optional.
