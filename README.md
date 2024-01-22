@@ -49,13 +49,13 @@ A Human: Fall Flat plugin based on [BePinEx](https://github.com/BepInEx/BepInEx)
  
     If `<level>`' has a value that is higher than the number of default levels (as the date of writting this, there are 14 default levels), extra levels will be loaded.
 
-    E.g. level 14 would load the level "Thermal"
+    E.g. `level 14` would load the level "Thermal".
 
   - It can now be ran in multiplayer sessions!
  
   **Sub-Objectives**
 
-  A new command, `subobj(s) <subobjective>`, which loads sub-objectives under the current checkpoint (AFAIK, sub-objectives is only used in the first checkpoint of "Factory")
+  A new command, `subobj(s) <subobjective>`, which loads sub-objectives under the current checkpoint (AFAIK, sub-objectives is only ever used in the first checkpoint of "Factory")
 
 - **New command `changecp(cc)`**
 
