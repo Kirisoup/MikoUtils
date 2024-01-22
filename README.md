@@ -21,13 +21,13 @@ A Human: Fall Flat plugin based on [BePinEx](https://github.com/BepInEx/BepInEx)
 
   Due to HFF devs' oversight, it is very easy for players with modified client to bypass /kick from the host (They can stay on the server and play, even after being kicked, untill they are disconnected from the session). 
 
-  This plugin fixed it by force disconnect the player after the original OnKick method. Simply use the `/kick` command or kick players from the pause menu as usual. 
+  This plugin fixed it by force disconnect the player after the original OnKick method. Simply use the `/kick` command or kick players from the pause menu as usual and it will do. 
 
 - **Toggle _Invite Only_, _Join Game in Progress_, _Lock Level_ options with commands, with a new _Lock Checkpoint_ option**
 
   `/invt`, `/join` and `/locklvl`
 
-  This allows you to change those options while playing a level, instead of going back to the lobby and loose the progress. 
+  This allows you to change those options while playing a level, instead of going back to the lobby and lose the progress. 
 
   - Additionally, this plugin introduced a new option which allows you to lock checkpoints, with command `/lockcp`. 
 
