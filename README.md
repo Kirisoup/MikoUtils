@@ -10,7 +10,7 @@ A Human: Fall Flat plugin based on [BePinEx](https://github.com/BepInEx/BepInEx)
   - Make sure that the folder named `BepInEx` is directly under the said directory
 3. Launch your game once, and close it; 
   - You should now see numeral folders under your `Human Fall Flat\BepInEx` directory, including one named `Plugins`
-4. Download the [latest release of MikoUtils](https://github.com/Kirisoup/MikoUtils/releases/latest), and put move into the `Human Fall Flat\BepInEx\Plugins` folder; 
+4. Download the [latest release of MikoUtils](https://github.com/Kirisoup/MikoUtils/releases/latest), and move it into the `Human Fall Flat\BepInEx\Plugins` folder; 
 5. The plugin should be installed successfully! 
 
 ## Features:
