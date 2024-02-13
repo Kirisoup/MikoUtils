@@ -1,15 +1,26 @@
-
 using System;
-using System.Reflection;
 using System.Collections.Generic;
-using BepInEx;
-using HarmonyLib;
-using Multiplayer;
 using I2.Loc;
 
 public partial class Lang
 {
+    public static void Translate()
+    {
+        switch(LocalizationManager.CurrentLanguage) 
+        {
+            case "Chinese Simplified":
+            zh_cn(); break;
+
+            case "chinese taiwan":
+            zh_cn(); break; // sorry taiwanese friends, this will be a fall back solution for now
+
+            default:
+            en(); break;
+        }
+    }
+
     public static string _b = Environment.NewLine;
+
     public static string _t = "\t";
 
     public static Dictionary<string, string> helps = new()
@@ -46,15 +57,4 @@ public partial class Lang
     public static string joinMsg;
     public static string leftMsg;
     public static string broadcast;
-
-    public static void Translate()
-    {
-        switch(LocalizationManager.CurrentLanguage) {
-            case "Chinese Simplified": zh_cn();
-            break;
-
-            default: en();
-            break;
-        }
-    }
 }

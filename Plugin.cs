@@ -4,9 +4,6 @@ using System.Collections.Generic;
 using BepInEx; 
 using HarmonyLib; 
 using Multiplayer; 
-using I2.Loc; 
-using System.Numerics; 
-using UnityEngine.Experimental.UIElements; 
  
 namespace MikoUtils 
 { 
@@ -537,21 +534,6 @@ namespace MikoUtils
             } 
         } 
  
-        public static int NumberHack(string txt, int cur) 
-        { 
-            int result; 
- 
-            if (txt.StartsWith("+") || txt.StartsWith("-")) 
-            { 
-                if (!int.TryParse(txt, out int delta)) return -1; 
- 
-                result = cur + delta; 
-            } 
-            else if (!int.TryParse(txt, out result)) return -1; 
- 
-            return Math.Max(0, result); 
-        } 
- 
         public class Chat 
         { 
             public static void MsgFormat(string notif) 
@@ -594,6 +576,21 @@ namespace MikoUtils
  
                 netStream?.Release(); 
             } 
+        } 
+ 
+        public static int NumberHack(string txt, int cur) 
+        { 
+            int result; 
+ 
+            if (txt.StartsWith("+") || txt.StartsWith("-")) 
+            { 
+                if (!int.TryParse(txt, out int delta)) return -1; 
+ 
+                result = cur + delta; 
+            } 
+            else if (!int.TryParse(txt, out result)) return -1; 
+ 
+            return Math.Max(0, result); 
         } 
  
         public static bool IsClient 

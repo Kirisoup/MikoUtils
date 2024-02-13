@@ -1,3 +1,4 @@
+// English is always loaded as a fall back
 public static partial class Lang
 {
     public static void en()
