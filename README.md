@@ -1,13 +1,17 @@
 # MikoUtils
 
-A Human: Fall Flat plugin based on [BePinEx](https://github.com/BepInEx/BepInEx), that aimed at simplicity and quality-of-life aspects of online session hosting. 
+[*中文*](https://github.com/Kirisoup/MikoUtils/blob/main/README/zh.md)
+
+A Human: Fall Flat plugin using [BePinEx](https://github.com/BepInEx/BepInEx), that aimed at simplicity and quality-of-life aspects of online session hosting. 
+
+Supports multi-language! Currently only supports Chinese (simplified) and English, feel welcomed to ask for other language support <3
 
 ## Usage: 
-1. Download the [latest release of BePinEx](https://github.com/BepInEx/BepInEx/releases/latest). AFAIK it should be the `BepInEx_x86... .zip` in most cases; 
-2. Unzip it and move it to the game directory; 
-  - i.e. where your `Human.exe` is located
-  - should be `SteamLibrary\steamapps\common\Human Fall Flat` by default
-  - Make sure that the folder named `BepInEx` is directly under the said directory
+1. Download the [latest release of BePinEx](https://github.com/BepInEx/BepInEx/releases/latest). It should be the `BepInEx_x86... .zip`; 
+2. Unzip it and move it to the game directory.
+  - i.e. where your `Human.exe` is located;
+  - should be `SteamLibrary\steamapps\common\Human Fall Flat` by default;
+  - After you moved them, make sure that the folder named `BepInEx` is directly under the said directory!
 3. Launch your game once, and close it; 
   - You should now see numeral folders under your `Human Fall Flat\BepInEx` directory, including one named `Plugins`
 4. Download the [latest release of MikoUtils](https://github.com/Kirisoup/MikoUtils/releases/latest), and move it into the `Human Fall Flat\BepInEx\Plugins` folder; 
@@ -15,54 +19,91 @@ A Human: Fall Flat plugin based on [BePinEx](https://github.com/BepInEx/BepInEx)
 
 ## Features:
 
-> Notice: Most, if not all, of the features only works if you are hosting the session. 
+> Notice: The features of this plugin are made for multiplayer lobby hosting, and should not be used as a client playing in others' lobbies (they won't do anything even if you tried).  
+> Though many of them work in single player too :D
 
-- **Force kick**: 
+Everything can be found with the vanilla `help` `/help` commands!
 
-  Due to HFF devs' oversight, it is very easy for players with modified client to bypass /kick from the host (They can stay on the server and play, even after being kicked, untill they are disconnected from the session). 
+### Multiplayer Utilities
 
-  This plugin fixed it by force disconnect the player after the original OnKick method. Simply use the `/kick` command or kick players from the pause menu as usual and it will do. 
+**Anti-Anti-Kick:**  
+Prevents players with anti-kick to annoy you and your friends.  
+Due to an oversight of this game, it is very easy for players with a modified game to bypass /kick from lobby host. This fixes the issue, by force disconnect the player (any further attempt to connect back to your lobby is prevented in vanilla, and will somehow crash their game lol)
 
-- **Toggle _Invite Only_, _Join Game in Progress_, _Lock Level_ options with commands, with a new _Lock Checkpoint_ option**
+**Disconnect Player:**  
+> Syntax: `/disconnect(dc) <player#>`  
+Disconnect the selected player from the lobby.
+- Unlike /kick, the player can still join the lobby after being disconnected;
+- Note: the implementation is not well polished, that clients won't realize themselves being disconnected, so their character freeze (They can still exit manually).
 
-  `/invt`, `/join` and `/locklvl`
+**Join & Left Message**  
+Print message in chat whenever a player joins or leaves the game.
 
-  This allows you to change those options while playing a level, instead of going back to the lobby and lose the progress. 
+**Broadcast Toggle:**  
+> Syntax: `/broadcast(bc)`  
+Toggle broadcasting commands to public chat (by default notifications are only visible to yourself).
+- If a notification begins with `=`, then only yourself can see it; if it starts with `#`, everyone can see it.
 
-  - Additionally, this plugin introduced a new option which allows you to lock checkpoints, with command `/lockcp`. 
+**Synchronize Level:**  
+> Syntax: `/synclvl(sync)`  
+An attempt to fix client-host level desync (i.e. the level not being properly updated for players due to connection issues, for example your lobby has finished Mansion and progressed to Train, but on the players' side the level they see is still Mansion).
 
-- **Multiple quality-of-life changes to `level(l)` and `cp(c)` console commands, and introduces a new command `subobj(s)`**
+### Load cheats (Console commands):
 
-  > The console can be opened by pressing `F1` or `~` while in game.
+#### Quality of life changes made for the vanilla `level(l)` and `cp(c)` commands:  
 
-  **General change:**
-  - You can now use +/-<integer> to load levels/checkpoints/sub-objectives relative to the current number (+/-1 can be abbreviated as +/-). 
+**`level` Command**  
+> Syntax: `level(l) <level> <checkpoint?>`  
+- `level` command now won't require the second <checkpoint> value;
+  > `level 0` will simply load Mansion
+  > `level 0 3` will still load the third cp of Mansion, like in vanilla (vanilla means the original game without modification)
+- `level` command can load extra levels! When you load a level with a number larger than the number of regular levels, extra levels are loaded (e.g. `level 14` will load Thermal);
+- you can use `level +/-<number?>` to load levels relative to the current level.
+  > - `level +1` to load the next level, `level -2` to load the second previous level
+  > - `level +` is equal to `level +1`, the same applies for `-`
 
-    E.g., `cp -1` or `c -` to load the previous checkpoint, or skip two levels ahead with `level +2` or `l +2`. 
+**`cp` Command:**  
+> Syntax: `cp(c) <checkpoint>`  
+- Similar to `level`, `cp +/-<number?>` will load checkpoint relative to the current one.
 
-  **Special changes to `level`:**
-  - The second parameter of `level` is now optional.
+#### New commands:
 
-    Level command used to require two parameters -- `level <level> <checkpoint>`, now if the second parameter is left empty, checkpoint 0 is loaded instead.
+**Sub-objective Command:**  
+> Syntax: `subobj(s) <sub-obj>`  
+Loads sub-objectives under the current checkpoint (*this is currently used in the first checkpoint in Factory -- the lever furnace puzzle*).
+- Will simply reload checkpoint if there is no sub-objectives under the current checkpoint.
 
-  - It can now load extra levels.
- 
-    If `<level>`' has a value that is higher than the number of default levels (as the date of writting this, there are 14 default levels), extra levels will be loaded.
+**Change Checkpoint Command:**  
+> Syntax: `changecp(cc) <checkpoint>`  
+Change current checkpoint without reload.
+- pretty usefull when you want to go to a checkpoint without disrupting other players and revert the map;
+- Especially useful when playing custom maps with complicated puzzles that cannot handle checkpoint reload properly!
 
-    E.g. `level 14` would load the level "Thermal".
+### Lobby settings (Chat commands, some accessible from console):
 
-  - It can now be ran in multiplayer sessions!
- 
-  **Sub-Objectives**
+Vanilla lobby settings can now be changed while inside level using commands (So you don't have to quit to lobby and lose your progress).
 
-  A new command, `subobj(s) <subobjective>`, which loads sub-objectives under the current checkpoint (AFAIK, sub-objectives is only ever used in the first checkpoint of "Factory")
+**"Invire Only" Toggle:**  
+> Syntax: `/invonly(io)`  
 
-- **New command `changecp(cc)`**
+**"Join Game in Progress" Toggle:**  
+> Syntax: `/joingame(jg)`  
 
-  This command changes the current checkpoint number, but does not load it, therefore the map won't be reset and players won't be respawned.
+**"Lock Level" Toggle:**  
+> Syntax: `/locklvl(lockl)`  
+Prevent players from finishing the level;
+- Also accessible in single player from console with `locklvl(lockl)`;
+- Single player setting and online lobby setting will be synchronized.
+
+**"Lock Checkpoint" Toggle** (*This is a new setting introduced with the plugin*):  
+> Syntax: `/lockcp(lockc)`  
+Prevent players from progressing to other checkpoints;
+- Single player setting and online lobby setting will be synchronized.
+- Also accessible in single player from console with `lockcp(lockc)`;
+- Does *not* prevent players from respawning at the current checkpoint;
+- Makes levels harder & prevents your progress to be messed up by strangers.
 
 ## TODO: 
-- Support English.
 - Some random ideas:
   - PartyPass: pass the level only if every players have entered the pass trigger
   - An option to let the host decide whether to accept a connection when new players are trying to join

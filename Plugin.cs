@@ -1,393 +1,631 @@
-﻿using System;
-using System.Reflection;
-using BepInEx;
-using HarmonyLib;
-using Multiplayer;
-
-namespace MikoUtils
-{
-    [BepInPlugin(PluginInfo.PLUGIN_GUID, PluginInfo.PLUGIN_NAME, PluginInfo.PLUGIN_VERSION)]
-    [BepInProcess("Human.exe")]
-    public class Plugin : BaseUnityPlugin
-    {
-        private Harmony _harmony;
-
-        public void Awake() { _harmony = new Harmony(PluginInfo.PLUGIN_GUID); }
-
-        public void Start() { _harmony.PatchAll();
-
-            // Register commands
-            // Shell.RegisterCommand("spamkick", new Action<string>(MikoCmds.OnSpamKick), "spamkick <player#> <times> \r\nRepeatedly kicks player (vanilla soft kick) \r\nUsefull for kicking some modded players in a funny way");
-            NetChat.RegisterCommand(true, false, "invt", new Action(MikoCmds.ToggleInvite), "/invt-切换仅限邀请");
-            NetChat.RegisterCommand(true, false, "join", new Action(MikoCmds.ToggleJoin), "/join-切换参加正在进行的游戏");
-            Shell.RegisterCommand("s", new Action<string>(MikoCmds.SubObjective), null);
-            Shell.RegisterCommand("subobj", new Action<string>(MikoCmds.SubObjective), "subobj(s) <subobjective> \r\n加载当前存档点下的次要目标 \r\nsubobjective~次要目标序号 接受的值：整数，+/-号，带+/-号的整数");
-            Shell.RegisterCommand("cc", new Action<string>(MikoCmds.ChangeCP), null);
-            Shell.RegisterCommand("changecp", new Action<string>(MikoCmds.ChangeCP), "cc <checkpoint> \r\n改变存档点，但不加载 \r\ncheckpoint~存档点序号 接受的值：整数，+/-号，带+/-号的整数");
-            NetChat.RegisterCommand(true, false, "lockcp", new Action(MikoCmds.LockCP), null);
-            NetChat.RegisterCommand(true, false, "locklvl", new Action(MikoCmds.LockLvl), null);
-        }
-
-        public void OnDestroy() { _harmony.UnpatchSelf(); }
-    }
-
-    public class MikoVar
-    {
-        public static bool CPLocked;
-    }
-
-    public class MikoFunc
-    {
-        // Used in level/checkpoint/subobject loading commands,
-        // making it possibel to load them with either absolute id, or steps relative from the id
-        public static int LoadNum(string txt, int cur)
-        {
-            int result;
-            if (txt.StartsWith("+") || txt.StartsWith("-"))
-            {
-                int delta;
-
-                if (!int.TryParse(txt, out delta))
-                {
-                    if (txt == "+") { delta = 1; }
-                    else if (txt == "-") { delta = -1; }
-                    else { return -1; }
-                }
-
-                result = cur + delta;
-            }
-            else if (!int.TryParse(txt, out result)) { return -1; }
-
-            return Math.Max(0, result);
-        }
-
-        // Used in level command,
-        // making it possibel to load extra levels
-        public static Tuple<ulong, WorkshopItemSource> EXLvl(ulong level, WorkshopItemSource levelType)
-        {
-            ulong builtInLength = (ulong)(long)Game.instance.levels.Length;
-            if (level >= builtInLength && levelType == WorkshopItemSource.BuiltIn)
-            {
-                level -= builtInLength;
-                levelType = WorkshopItemSource.EditorPick;
-            }
-            return Tuple.Create(level, levelType);;
-        }
-    }
-
-    public class MikoCmds 
-    {
-        // // Spam kick - host
-        // // + equivalent to spamming /kick <#player> (vanilla /kick instead of Power kick)
-        // // + Why? Because it is funny lol
-        // public static void OnSpamKick(string txt)
-        // {
-        //     if (string.IsNullOrEmpty(txt))
-        //     {
-        //         CommandRegistry.ShowCurrentHelp();
-        //         return;
-        //     }
-
-        //     string[] array = txt.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-        //     string plr;
-        //     int times;
-
-        //     if (array.Length == 1)
-        //     {
-        //         plr = txt;
-        //         times = 999;
-        //     }
-        //     else if (array.Length == 2)
-        //     {
-        //         plr = array[0];
-        //         if (!int.TryParse(array[1], out times))
-        //         {
-        //             Shell.Print($"不接受当前值 \"{array[1]}\" 为重复次数");
-        //             return;
-        //         }
-        //     }
-        //     else
-        //     {
-        //         Shell.Print("多余参数");
-        //         return;
-        //     }
-
-        //     NetChat instance = NetChat.instance;
-
-        //     MethodInfo methodInfo = typeof(NetChat).GetMethod("GetClient", BindingFlags.NonPublic | BindingFlags.Instance);
-        //     NetHost client = (NetHost)methodInfo.Invoke(instance, new object[] { plr });
-
-        //     if (client == null)
-        //     {
-        //         return;
-        //     }
-
-        //     if (client == NetGame.instance.local)
-        //     {
-        //         Shell.Print("不会踢走自己");
-        //         return;
-        //     }
-
-        //     for (int i = 0; i < times; i++)
-        //     {
-        //         NetGame.instance.Kick(client);
-        //     }
-        // }
-
-        // In game InviteOnly toggle - host
-        public static void ToggleInvite()
-        {
-            Options.lobbyInviteOnly ^= 1;
-
-			NetGame.instance.transport.UpdateLobbyType();
-			NetGame.instance.transport.UpdateOptionsLobbyData();
-
-            NetChat.Print($"仅限邀请：{Convert.ToBoolean(Options.lobbyInviteOnly)}");
-        }
-
-        // In game JoinInProgress toggle - host
-        public static void ToggleJoin()
-        {
-            Options.lobbyJoinInProgress ^= 1;
-
-			NetGame.instance.transport.UpdateJoinInProgress();
-			NetGame.instance.transport.UpdateOptionsLobbyData();
-
-            NetChat.Print($"参加正在进行的游戏：{Convert.ToBoolean(Options.lobbyJoinInProgress)}");
-        }
-
-        // Load SubObjective (similar to level and cp) - host
-        public static void SubObjective(string txt)
-        {
-            if (string.IsNullOrEmpty(txt))
-            {
-                Shell.Print("subobj(s) <subobjective> \r\n加载当前存档点下的次要目标 \r\nsubobjective~次要目标序号 接受的值：整数，+/-号，带+/-号的整数");
-                return;
-            }
-
-            int S;
-
-            S = MikoFunc.LoadNum(txt, Game.instance.currentCheckpointSubObjectives);
-
-            if (S == -1)
-            {
-                Shell.Print($"不接受当前值 \"{txt}\"");
-                return;
-            }
-
-            try
-            {
-                Game.instance.RestartCheckpoint(Game.instance.currentCheckpointNumber, S);
-                Shell.Print(string.Format($"加载次要目标 {S}"));
-            }
-            catch
-            {
-            }
-        }
-
-        public static void ChangeCP(string txt) {
-            if (string.IsNullOrEmpty(txt))
-            {
-                Shell.Print("cc");
-                return;
-            }
-
-            int C;
-
-            C = MikoFunc.LoadNum(txt, Game.instance.currentCheckpointNumber);
-
-            if (C == -1)
-            {
-                Shell.Print($"不接受当前值 \"{txt}\"");
-                return;
-            }
-
-            try
-            {
-                Game.instance.currentCheckpointNumber = Math.Min(C, Game.currentLevel.checkpoints.Length - 1);
-                Game.instance.currentCheckpointSubObjectives = 0;
-                Shell.Print(string.Format($"更改至存档点 {C}"));
-            }
-            catch
-            {
-            }
-        }
-
-        public static void LockCP() 
-        {
-            MikoVar.CPLocked = !MikoVar.CPLocked;
-            NetChat.Print($"锁定存档点：{MikoVar.CPLocked}");
-        }
-
-        public static void LockLvl()
-        {
-            Options.lobbyLockLevel ^= 1;
-			NetGame.instance.transport.UpdateOptionsLobbyData();
-            NetChat.Print($"锁定关卡：{Convert.ToBoolean(Options.lobbyLockLevel)}");
-        }
-    }
-
-    // Power kick - host
-    // + Force disconnect players from the host after /kick <#player>
-    // + Further attempt from the players to connect to the session is already stopped by vanilla game \ / 
-    [HarmonyPatch(typeof(NetChat), "OnKick")]
-    public class YesKick
-    {
-        public static void Postfix(NetChat __instance, string txt)
-        {
-            MethodInfo methodInfo = AccessTools.Method(typeof(NetChat), "GetClient");
-            NetHost client = (NetHost)methodInfo.Invoke(__instance, new object[] { txt });
-
-            NetGame.instance.OnDisconnect(client.connection, false);
-        }
-    }
-
-    // Level Command utilities - host
-    // + level(l) command can be used in multiplayer session now
-    // + relative level loading.
-    [HarmonyPatch(typeof(CheatCodes), "LevelChange")]
-    public class LevelChange
-    {
-        public static bool Prefix(string txt)
-        {
-            if (string.IsNullOrEmpty(txt))
-            {
-                Shell.Print("level(l) <level> <checkpoint> \r\n加载关卡 \r\nlevel~关卡序号 接受的值：整数，+/-号，带+/-号的整数 \r\ncheckpoint~存档点序号 接受的值：整数，留空");
-                return false;
-            }
-
-            if (NetGame.isServer && Game.instance.currentLevelNumber == -1)
-            {
-                Shell.Print("无法在大厅内切换关卡");
-                return false;
-            }
-
-            string[] array = txt.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-
-            if (array.Length > 2)
-            {
-                Shell.Print("参数过长");
-                return false;
-            }
-
-            int L;
-            int C = 0;
-
-            // level
-            L = MikoFunc.LoadNum(array[0], Game.instance.currentLevelNumber);
-
-            if (L == -1)
-            {
-                Shell.Print($"不接受当前值 \"{array[0]}\"");
-                return false;
-            }
-
-            L = Math.Min(Game.instance.levels.Length + Game.instance.editorPickLevels.Length - 1, L);
-
-            // cp
-            if (array.Length == 2)
-            {
-                if (!int.TryParse(array[1], out C))
-                {
-                    Shell.Print($"不接受当前值 \"{array[1]}\"");
-                    return false;
-                }
-            }
-
-            C = Math.Max(0, C);
-
-            try
-            {
-                App.instance.StartNextLevel((ulong)(long)L, C);
-                Shell.Print($"加载关卡 {L} 存档点 {C}");
-            }
-            catch {}
-            
-            return false;
-        }
-    }
-
-    [HarmonyPatch(typeof(NetGame), "ServerLoadLevel")]
-    public class ServerLoadEX
-    {
-        public static bool Prefix(ref ulong number, ref WorkshopItemSource levelType)
-        {
-            Tuple<ulong, WorkshopItemSource> r = MikoFunc.EXLvl(number, levelType);
-            number = r.Item1; levelType = r.Item2;
-
-            return true;
-        }
-    }
-    [HarmonyPatch(typeof(App), "LaunchGame", new Type[] { typeof(ulong), typeof(WorkshopItemSource), typeof(int), typeof(int), typeof(Action) })]
-    public class LaunchEX
-    {
-        public static bool Prefix(ref ulong level, ref WorkshopItemSource levelType)
-        {
-            Tuple<ulong, WorkshopItemSource> r = MikoFunc.EXLvl(level, levelType);
-            level = r.Item1; levelType = r.Item2;
-
-            return true;
-        }
-    }
-
-    [HarmonyPatch(typeof(App), "LevelLoadedServer")]
-    public class EXLoadedServer
-    {
-        public static bool Prefix(ref ulong level, ref WorkshopItemSource levelType)
-        {
-            Tuple<ulong, WorkshopItemSource> r = MikoFunc.EXLvl(level, levelType);
-            level = r.Item1; levelType = r.Item2;
-
-            return true;
-        }
-    }
-
-
-    // CP command utilities - host
-    // + relative cp loading.
-    [HarmonyPatch(typeof(CheatCodes), "CheckpointChange")]
-    public class CheckpointChange
-    {
-        public static bool Prefix(string txt)
-        {
-            if (string.IsNullOrEmpty(txt))
-            {
-                Shell.Print("cp(c) <checkpoint> \r\n加载存档点 \r\ncheckpoint~存档点序号 接受的值：整数，+/-号，带+/-号的整数");
-                return false;
-            }
-
-            int C;
-
-            C = MikoFunc.LoadNum(txt, Game.instance.currentCheckpointNumber);
-
-            if (C == -1)
-            {
-                Shell.Print($"不接受当前值 \"{txt}\"");
-                return false;
-            }
-
-            try
-            {
-                Game.instance.RestartCheckpoint(C, 0);
-                Shell.Print(string.Format($"加载存档点 {C}"));
-                return false;
-            }
-            catch
-            {
-            }
-
-            return false;
-        }
-    }
-
-    [HarmonyPatch(typeof(Game), "EnterCheckpoint")]
-    public class NoCP
-    {
-        public static bool Prefix()
-        {
-            if (MikoVar.CPLocked == true) { return false; }
-
-            return true;
-        }
-    }
-}
+﻿using System; 
+using System.Reflection; 
+using System.Collections.Generic; 
+using BepInEx; 
+using HarmonyLib; 
+using Multiplayer; 
+using I2.Loc; 
+using System.Numerics; 
+using UnityEngine.Experimental.UIElements; 
+ 
+namespace MikoUtils 
+{ 
+    [BepInPlugin(PluginInfo.PLUGIN_GUID, PluginInfo.PLUGIN_NAME, PluginInfo.PLUGIN_VERSION)] 
+    [BepInProcess("Human.exe")] 
+    public class Plugin : BaseUnityPlugin 
+    { 
+        public Harmony harmony; 
+ 
+        public void Awake() 
+        { 
+            harmony = new Harmony(PluginInfo.PLUGIN_GUID); 
+        } 
+ 
+        public void Start() 
+        { 
+            harmony.PatchAll(); 
+ 
+            Lang.Translate(); 
+            MikoCmds.Reg.RegCmds(); 
+        } 
+ 
+        public void OnDestroy() 
+        { 
+            harmony.UnpatchSelf(); 
+        } 
+ 
+        public class MikoCmds 
+        { 
+            public class Reg 
+            { 
+                public static void RegCmds() 
+                { 
+                    /* load cheats */ 
+                    RegShell("subobj", "s", 
+                        new Action<string>(Cmds.LoadSubObj), 
+                        Lang.helps["subobj"], "<subobj>" 
+                    ); 
+ 
+                    RegShell("changecp", "cc", 
+                        new Action<string>(Cmds.ChangeCP),  
+                        Lang.helps["changecp"], "<checkpoint>" 
+                    ); 
+ 
+                    ModHelp("level", "l", 
+                        Lang.helps["level"], "<level> <checkpoint?>" 
+                    ); 
+ 
+                    ModHelp("cp", "c", 
+                        Lang.helps["cp"], "<checkpoint>" 
+                    ); 
+ 
+                    /* lobby settings */ 
+                    RegChat("invonly", "io", 
+                        new Action(Cmds.ToggleInvite),  
+                        Lang.helps["invite"] 
+                    ); 
+ 
+                    RegChat("joingame", "join", 
+                        new Action(Cmds.ToggleJoin),  
+                        Lang.helps["joingame"] 
+                    ); 
+ 
+                    RegChat("locklvl", "lockl", 
+                        new Action(Cmds.LockLvl.ChatEntry),  
+                        Lang.helps["locklvl"] 
+                    ); 
+ 
+                    RegShell("locklvl", "lockl", 
+                        new Action(Cmds.LockLvl.ShellEntry),  
+                        Lang.helps["locklvl"] 
+                    ); 
+ 
+                    RegChat("lockcp", "lockc", 
+                        new Action(Cmds.LockCP.ChatEntry),  
+                        Lang.helps["lockcp"] 
+                    ); 
+ 
+                    RegShell("lockcp", "lockc", 
+                        new Action(Cmds.LockCP.ShellEntry),  
+                        Lang.helps["lockcp"] 
+                    ); 
+ 
+                    /* mp utils */ 
+                    RegChat("broadcast", "", 
+                        new Action(Cmds.ToggleBroadcast),  
+                        Lang.helps["broadcast"] 
+                    ); 
+ 
+                    RegChat("disconnect", "dc", 
+                        new Action<string>(Cmds.Disconnect),  
+                        Lang.helps["disconnect"], "<player#>" 
+                    ); 
+ 
+                    RegChat("synclvl", "sync", 
+                        new Action(Cmds.SyncLvl),  
+                        Lang.helps["synclvl"] 
+                    ); 
+                } 
+ 
+                private static void RegShell(string cmd, string abbr, Action action, string help = null) 
+                { 
+                    help = HelpUtil(cmd, abbr, help); 
+ 
+                    Shell.RegisterCommand(cmd, action, help); 
+ 
+                    if (!string.IsNullOrEmpty(abbr)) Shell.RegisterCommand(abbr, action, null); 
+                } 
+                private static void RegShell(string cmd, string abbr, Action<string> action, string help = null, string val = null) 
+                { 
+                    help = HelpUtil(cmd, abbr, help, val); 
+ 
+                    Shell.RegisterCommand(cmd, action, help); 
+ 
+                    if (!string.IsNullOrEmpty(abbr)) Shell.RegisterCommand(abbr, action, null); 
+                } 
+ 
+                private static void RegChat(string cmd, string abbr, Action action, string help = null, string val = null) 
+                { 
+                    help = HelpUtil_(cmd, abbr, help); 
+ 
+                    NetChat.RegisterCommand(true, false, cmd, action, help); 
+ 
+                    if (!string.IsNullOrEmpty(abbr)) NetChat.RegisterCommand(true, false, abbr, action, null); 
+                } 
+                private static void RegChat(string cmd, string abbr, Action<string> action, string help = null, string val = null) 
+                { 
+                    help = HelpUtil_(cmd, abbr, help, val); 
+ 
+                    NetChat.RegisterCommand(true, false, cmd, action, help); 
+ 
+                    if (!string.IsNullOrEmpty(abbr)) NetChat.RegisterCommand(true, false, abbr, action, null); 
+                } 
+ 
+                private static void ModHelp(string cmd, string abbr, string help, string val = null) 
+                {  
+                    try { description_[cmd] = HelpUtil(cmd, abbr, help, val); } catch {} 
+                } 
+ 
+                private static string HelpUtil(string cmd, string abbr, string help, string val = null) 
+                { 
+                    // unless help is null, prefix help with "cmd - " or "cmd(abbr) - " 
+                    return string.IsNullOrEmpty(help) ? 
+                        null : 
+                        $"{cmd}{( 
+                            string.IsNullOrEmpty(abbr) ? 
+                                null : 
+                                $"({abbr})" 
+                        )}{( 
+                            string.IsNullOrEmpty(abbr) ? 
+                                null : 
+                                " " + val 
+                        )} - {help}";  
+                } 
+ 
+                private static string HelpUtil_(string cmd, string abbr, string help, string val = null) 
+                { 
+                    return "/" + HelpUtil(cmd, abbr, help, val); // unless help is null, prefix help with "/cmd - " or "/cmd(abbr) - " 
+                } 
+ 
+                private static FieldInfo commandsField = typeof(Shell).GetField("commands", BindingFlags.NonPublic | BindingFlags.Static); 
+                private static CommandRegistry CommandRegistry_ = (CommandRegistry)commandsField.GetValue(null); 
+ 
+                private static FieldInfo descriptionfield = typeof(CommandRegistry).GetField("description", BindingFlags.NonPublic | BindingFlags.Instance); 
+                private static Dictionary<string, string> description_ = (Dictionary<string, string>)descriptionfield.GetValue(CommandRegistry_); 
+            } 
+ 
+            public class Cmds 
+            { 
+                public static void LoadSubObj(string txt) 
+                { 
+                    if (Empty(txt, Lang.helps["subobj"])) return; 
+ 
+                    if (IsClient) return; 
+ 
+                    int S = NumberHack(txt, Game.instance.currentCheckpointSubObjectives); 
+ 
+                    if (BadVal(S == -1)) return; 
+ 
+                    try { 
+                        Game.instance.RestartCheckpoint(Game.instance.currentCheckpointNumber, S); 
+                        Shell.Print($"{Lang.loadSubobj}: {S}"); 
+                    } catch {} 
+                } 
+ 
+                public static void ChangeCP(string txt) 
+                { 
+                    if (Empty(txt, Lang.helps["changecp"])) return; 
+ 
+                    if (IsClient) return; 
+ 
+                    int C = NumberHack(txt, Game.instance.currentCheckpointNumber); 
+ 
+                    if (BadVal(C == -1)) return; 
+ 
+                    try { 
+                        Game.instance.currentCheckpointNumber = Math.Min(C, Game.currentLevel.checkpoints.Length - 1); 
+                        Game.instance.currentCheckpointSubObjectives = 0; 
+                        Shell.Print($"{Lang.changeCP}: {C}"); 
+                    } catch {} 
+                } 
+ 
+                public static void Disconnect(string txt) 
+                { 
+                    if (IsClient) return; 
+ 
+                    MethodInfo methodInfo = AccessTools.Method(typeof(NetChat), "GetClient"); 
+                    NetHost client = (NetHost)methodInfo.Invoke(NetChat.instance, new object[] { txt }); 
+ 
+                    NetGame.instance.OnDisconnect(client.connection, false); 
+                } 
+ 
+                public static void ToggleBroadcast() 
+                { 
+                    if (IsClient) return; 
+ 
+                    DoBroadcast = !DoBroadcast; 
+ 
+                    string Bool = $"{DoBroadcast}"; 
+                    Chat.Msg($"<color=#00DDDD>= {Lang.broadcast}: {Chat.FormatKW(Bool)}</color>"); 
+                } 
+ 
+                public static void ToggleInvite() 
+                { 
+                    if (IsClient) return; 
+ 
+                    Options.lobbyInviteOnly ^= 1; 
+ 
+                    NetGame.instance.transport.UpdateLobbyType(); 
+                    NetGame.instance.transport.UpdateOptionsLobbyData(); 
+ 
+                    string Bool = $"{Convert.ToBoolean(Options.lobbyInviteOnly)}"; 
+                    Chat.MsgFormat($"{Lang.inviteOnly}: {Chat.FormatKW(Bool)}"); 
+                } 
+ 
+                public static void ToggleJoin() 
+                { 
+                    if (IsClient) return; 
+ 
+                    Options.lobbyJoinInProgress ^= 1; 
+ 
+                    NetGame.instance.transport.UpdateJoinInProgress(); 
+                    NetGame.instance.transport.UpdateOptionsLobbyData(); 
+ 
+                    string Bool = $"{Convert.ToBoolean(Options.lobbyJoinInProgress)}"; 
+                    Chat.MsgFormat($"{Lang.joinInProgress}: {Chat.FormatKW(Bool)}"); 
+                } 
+ 
+                public class LockCP 
+                { 
+                    public static void ChatEntry()  
+                    { 
+                        if (IsClient) return; 
+ 
+                        Toggle(); 
+ 
+                        Chat.MsgFormat($"{Lang.lockCP}: {Chat.FormatKW($"{CPLocked}")}"); 
+                    } 
+ 
+                    public static void ShellEntry()  
+                    { 
+                        if (IsClient) return; 
+ 
+                        Toggle(); 
+ 
+                        Shell.Print($"{Lang.lockCP}: {CPLocked}"); 
+                    } 
+ 
+                    private static void Toggle() 
+                    { 
+                        CPLocked = !CPLocked; 
+                    } 
+                } 
+ 
+                public class LockLvl 
+                { 
+                    public static void ChatEntry() 
+                    { 
+                        if (IsClient) return; 
+ 
+                        Toggle(); 
+ 
+                        Chat.MsgFormat($"{Lang.lockLvl}: {Chat.FormatKW($"{LvlLocked}")}"); 
+                    } 
+ 
+                    public static void ShellEntry() 
+                    { 
+                        if (IsClient) return; 
+ 
+                        Toggle(); 
+ 
+                        Shell.Print($"{Lang.lockLvl}: {LvlLocked}"); 
+                    } 
+ 
+                    private static void Toggle() 
+                    { 
+                        LvlLocked = !LvlLocked; 
+ 
+                        if (NetGame.isServer) ToggleSvr(); 
+                    } 
+ 
+                    private static void ToggleSvr() 
+                    { 
+                        Options.lobbyLockLevel = LvlLocked ? 1 : 0; 
+                        NetGame.instance.transport.UpdateOptionsLobbyData(); 
+                    } 
+                } 
+ 
+                public static void SyncLvl() 
+                { 
+                    if (App.state == AppSate.ServerPlayLevel || App.state == AppSate.ServerLobby) 
+                    NetGame.instance.ServerLoadLevel((ulong)(long)Game.instance.currentLevelNumber, Game.instance.currentLevelType, true, 0U); 
+                } 
+            } 
+ 
+            public static bool CPLocked; 
+ 
+            public static bool LvlLocked = Options.lobbyLockLevel != 0; 
+ 
+            public static bool DoBroadcast; 
+ 
+        } 
+ 
+        public class MikoPatch 
+        { 
+            public class LevelCmd 
+            { 
+                [HarmonyPatch(typeof(CheatCodes), "LevelChange")] 
+                public class LevelChange 
+                { 
+                    public static bool Prefix(string txt) 
+                    { 
+                        LoadLevel(txt); 
+                        return false; 
+                    } 
+                } 
+ 
+                [HarmonyPatch(typeof(NetGame), "ServerLoadLevel")] 
+                [HarmonyWrapSafe] 
+                public class ExServerLoadLevel 
+                { 
+                    public static bool Prefix(ref ulong number, ref WorkshopItemSource levelType) 
+                    { 
+                        object[] result = IfEx(number, levelType); 
+                        number = (ulong)result[0]; levelType = (WorkshopItemSource)result[1]; 
+ 
+                        return true; 
+                    } 
+                } 
+ 
+                [HarmonyPatch(typeof(App), "LaunchGame", new Type[] { typeof(ulong), typeof(WorkshopItemSource), typeof(int), typeof(int), typeof(Action) })] 
+                [HarmonyWrapSafe] 
+                public class ExLaunchGame 
+                { 
+                    public static bool Prefix(ref ulong level, ref WorkshopItemSource levelType) 
+                    { 
+                        object[] result = IfEx(level, levelType); 
+                        level = (ulong)result[0]; levelType = (WorkshopItemSource)result[1]; 
+ 
+                        return true; 
+                    } 
+                } 
+ 
+                [HarmonyPatch(typeof(App), "LevelLoadedServer")] 
+                [HarmonyWrapSafe] 
+                public class ExLevelLoadedServer 
+                { 
+                    public static bool Prefix(ref ulong level, ref WorkshopItemSource levelType) 
+                    { 
+                        object[] result = IfEx(level, levelType); 
+                        level = (ulong)result[0]; levelType = (WorkshopItemSource)result[1]; 
+ 
+                        return true; 
+                    } 
+                } 
+ 
+                private static object[] IfEx(ulong level, WorkshopItemSource levelType) 
+                { 
+                    ulong builtInLength = (ulong)(long)Game.instance.levels.Length; 
+                    if (level >= builtInLength && levelType == WorkshopItemSource.BuiltIn) 
+                    { 
+                        level -= builtInLength; 
+                        levelType = WorkshopItemSource.EditorPick; 
+                    } 
+                    return new object[] {level, levelType}; 
+                } 
+ 
+                private static void LoadLevel(string txt) 
+                { 
+                    if (Empty(txt, Lang.helps["level"])) return; 
+ 
+                    if (IsClient) return; 
+ 
+                    if (NetGame.isServer && Game.instance.currentLevelNumber == -1) 
+                    { 
+                        Shell.Print(Lang.errors["inLobby"]); 
+                        return; 
+                    } 
+ 
+                    string[] array = txt.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries); 
+ 
+                    if (TooLong(array, 2)) return; 
+ 
+                    // level 
+                    int CurL = Game.instance.currentLevelNumber; 
+                    int NumL = Game.instance.levels.Length; 
+                    int NumL_ = Game.instance.editorPickLevels.Length; 
+                    string TypeL = Game.instance.currentLevelType.ToString(); 
+ 
+                    if (TypeL != "BuiltIn") 
+                    { 
+                        if (TypeL == "EditorPick") CurL += NumL; 
+ 
+                        else CurL = 0; 
+                    } 
+ 
+                    int L = NumberHack(array[0], CurL); 
+ 
+                    if (BadVal(L == -1)) return; 
+ 
+                    L = Math.Min(NumL + NumL_ - 1, L); 
+ 
+                    // cp 
+                    int C = 0; 
+ 
+                    if (array.Length == 2) 
+                    if (BadVal(!int.TryParse(array[1], out C))) return; 
+ 
+                    C = Math.Max(0, C); 
+ 
+                    try { 
+                        App.instance.StartNextLevel((ulong)(long)L, C); 
+                        Shell.Print($"{Lang.loadLevel}: {L}; {Lang.loadCP}: {C}"); 
+                    } catch { } 
+                } 
+            } 
+ 
+            public class CPCmd 
+            { 
+                [HarmonyPatch(typeof(CheatCodes), "CheckpointChange")] 
+                public class CheckpointChange 
+                { 
+                    public static bool Prefix(string txt) 
+                    { 
+                        LoadCP(txt); 
+                        return false; 
+                    } 
+                } 
+ 
+                private static void LoadCP(string txt) 
+                { 
+                    if (Empty(txt, Lang.helps["cp"])) return; 
+ 
+                    if (IsClient) return; 
+ 
+                    int C; 
+ 
+                    C = NumberHack(txt, Game.instance.currentCheckpointNumber); 
+ 
+                    if (BadVal(C == -1)) return; 
+ 
+                    try { 
+                        Game.instance.RestartCheckpoint(C, 0); 
+                        Shell.Print($"{Lang.loadCP}: {C}"); 
+                        return; 
+                    } catch {} 
+                } 
+            } 
+ 
+            [HarmonyPatch(typeof(NetChat), "OnKick")] 
+            public class AntiAntiKick 
+            { 
+                public static void Postfix(string txt) 
+                { 
+                    if (int.TryParse(txt, out int num) && num - 2 < NetGame.instance.readyclients.Count && num > 1) 
+                    { 
+                        NetHost client = NetGame.instance.readyclients[num - 2]; 
+                        NetGame.instance.OnDisconnect(client.connection, false); 
+                    } 
+                } 
+            } 
+ 
+            [HarmonyPatch(typeof(Game), "EnterCheckpoint")] 
+            public class LockCP 
+            { 
+                public static bool Prefix() 
+                { 
+                    if (MikoCmds.CPLocked == true) return false; 
+                    return true; 
+                } 
+            } 
+ 
+            [HarmonyPatch(typeof(Game), "EnterPassZone")] 
+            public class LockLvl 
+            { 
+                public static bool Prefix() 
+                { 
+                    if (MikoCmds.LvlLocked && !NetGame.isServer) return false; 
+                    return true; 
+                } 
+            } 
+ 
+            [HarmonyPatch(typeof(NetGame), "OnClientHelo")] 
+            public class JoinMsg 
+            { 
+                public static void Postfix(ref NetHost client) 
+                { 
+                    Chat.MsgFormat($"<size=18>{Chat.FormatKW($"{client.name}")} {Lang.joinMsg}</size>"); 
+                } 
+            } 
+ 
+            [HarmonyPatch(typeof(NetGame), "OnServerDisconnect")] 
+            public class LeftMsg 
+            { 
+                public static void Postfix(ref NetHost client) 
+                { 
+                    Chat.MsgFormat($"<size=18>{Chat.FormatKW($"{client.name}")} {Lang.leftMsg}</size>"); 
+                } 
+            } 
+ 
+            [HarmonyPatch(typeof(LanguageMenu), "SetLanguage")] 
+            public class UpdateLanguage 
+            { 
+                public static void Postfix() 
+                { 
+                    Lang.Translate(); 
+                } 
+            } 
+        } 
+ 
+        public static int NumberHack(string txt, int cur) 
+        { 
+            int result; 
+ 
+            if (txt.StartsWith("+") || txt.StartsWith("-")) 
+            { 
+                if (!int.TryParse(txt, out int delta)) return -1; 
+ 
+                result = cur + delta; 
+            } 
+            else if (!int.TryParse(txt, out result)) return -1; 
+ 
+            return Math.Max(0, result); 
+        } 
+ 
+        public class Chat 
+        { 
+            public static void MsgFormat(string notif) 
+            { 
+                if (!MikoCmds.DoBroadcast) Msg($"<color=#00DDDD>= {notif}</color>", 0); 
+ 
+                else Msg($"<color=#00DDDD># {notif}</color>"); 
+            } 
+ 
+            public static string FormatKW(string kw) 
+            { 
+                kw = $"<color=#FFFFFF><b>{kw}</b></color>"; 
+                return kw; 
+            } 
+ 
+            public static void Msg(string msg, int clientId = -1) 
+            { 
+                if (NetGame.isClient) return; 
+ 
+                NetStream netStream = NetGame.BeginMessage(NetMsgId.Chat); 
+ 
+                netStream.WriteNetId(NetGame.instance.local.hostId); 
+                netStream.Write(msg); 
+                  
+                if (clientId == -1) 
+                { 
+                    NetChat.Print(msg); 
+ 
+                    for (int i = 0; i < NetGame.instance.readyclients.Count; i++) 
+                    NetGame.instance.SendReliable(NetGame.instance.readyclients[i], netStream); 
+                } 
+ 
+                else if (clientId == 0) NetChat.Print(msg); 
+ 
+                else 
+                { 
+                    NetHost sendto = NetGame.instance.FindReadyHost((uint)clientId); 
+                    NetGame.instance.SendReliable(sendto, netStream); 
+                } 
+ 
+                netStream?.Release(); 
+            } 
+        } 
+ 
+        public static bool IsClient 
+        {  
+            get { 
+                bool flag = NetGame.isClient; 
+                if (flag) Shell.Print(Lang.errors["isClient"]); 
+                return flag; 
+            } 
+        } 
+ 
+        public static bool BadVal(bool flag) 
+        { 
+            if (flag) Shell.Print(Lang.errors["badVal"]); 
+            return flag; 
+        } 
+ 
+        public static bool Empty(string txt, string help, bool ChatInstead = false) 
+        { 
+            bool flag = string.IsNullOrEmpty(txt); 
+            if (flag) {  
+                if (ChatInstead) NetChat.Print(help);  
+                else Shell.Print(help); 
+            } 
+            return flag; 
+        } 
+ 
+        public static bool TooLong(Array array, int expected) 
+        { 
+            bool flag = array.Length > expected; 
+            if (flag) Shell.Print(Lang.errors["tooLong"]); 
+            return flag; 
+        } 
+    } 
+} 
